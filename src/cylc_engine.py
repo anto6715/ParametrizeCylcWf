@@ -10,7 +10,8 @@ from pathlib import Path
 from src import cylc_config as cfg
 
 logger = logging.getLogger("medfs")
-STR_INDEX = re.compile("\d+$")
+logger.setLevel(logging.INFO)
+STR_INDEX = re.compile(r"(\d+)$")
 
 
 class CylcEngine:
@@ -41,7 +42,21 @@ class CylcEngine:
     @property
     def contact_path(self) -> Path:
         """Path to contact file (special sem file used by cylc itself)"""
-        return cfg.cylc_run() / ".service" / "contact"
+        return cfg.cylc_run() / self.id / ".service" / "contact"
+
+    @property
+    def workflow_run_path(self) -> Path:
+        return cfg.cylc_run() / self.id
+
+    @property
+    def cylc_src_workflow_base_path(self) -> Path:
+        """Path to workflow directory in cylc-src"""
+        return cfg.cylc_src() / self.workflow_name
+
+    @property
+    def cylc_src_workflow(self) -> Path:
+        """Path to workflow installed in cylc-src path"""
+        return self.cylc_src_workflow_base_path / cfg.CYLC_SRC_FLOW_NAME
 
     def exec(self, cmd: str, opt: str, ignore: bool = False) -> None:
         """
@@ -67,14 +82,16 @@ class CylcEngine:
                 exit(1)
 
     def id_exist(self) -> bool:
-        return (cfg.cylc_run() / self.id).exists()
+        return self.workflow_run_path.exists()
 
     def stop(self) -> None:
+        """Wrapper to 'cylc stop' command + a sleep time to wait cylc"""
         self.exec("stop", ignore=True)
         # usually cylc stop return immediately, but it takes some seconds to be effective
         time.sleep(3)
 
     def clean(self):
+        """Wrapper to 'cylc clean' command"""
         if not self.id_exist():
             return
         self.exec("clean")
@@ -85,24 +102,18 @@ class CylcEngine:
         self.exec("install", opt=f"--run-name {self.installed_run_name}")
 
     def play(self):
+        """Wrapper to 'cylc play' command"""
         self.exec("play")
-
-    def cylc_src_workflow_base_path(self) -> Path:
-        """Path to workflow directory in cylc-src"""
-        return cfg.cylc_src() / self.workflow_name
-
-    def cylc_src_workflow(self) -> Path:
-        """Path to workflow installed in cylc-src path"""
-        return self.cylc_src_workflow_base_path() / cfg.CYLC_SRC_FLOW_NAME
 
     def stop_and_clean(self):
         self.stop()
         self.clean()
-        shutil.rmtree(self.cylc_src_workflow_base_path(), ignore_errors=True)
+        shutil.rmtree(self.cylc_src_workflow_base_path, ignore_errors=True)
 
-    def link_flow_to_cylc_src(self):
-        cylc_src_wf = self.cylc_src_workflow()
+    def link_flow_to_cylc_src(self) -> None:
+        cylc_src_wf = self.cylc_src_workflow
         try:
+            cylc_src_wf.parent.mkdir(parents=True)
             cylc_src_wf.symlink_to(self.flow)
         except FileExistsError:
             if cylc_src_wf.samefile(self.flow):
@@ -151,9 +162,13 @@ class CylcEngine:
 
 def increase_index_in_str(s: str) -> str:
     """Given a string like expX, return expY, where Y = X + 1"""
-    try:
-        index = int(STR_INDEX.findall(s)[0])
-    except IndexError:
-        index = 0
-
-    return s.replace(s, str(index + 1))
+    match = STR_INDEX.search(s)
+    if match:
+        # Get the starting position of the number and the number itself.
+        start_index = match.start()
+        number = int(match.group())
+        # Increment the number and reconstruct the string.
+        return s[:start_index] + str(number + 1)
+    else:
+        # If no number is found, append "1" to the string.
+        return f"{s}1"
