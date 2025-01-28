@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import logging
-import re
 import shutil
 import subprocess
 import time
@@ -11,7 +10,6 @@ from src.cylc import cylc_config as cfg
 from src.cylc.util import increase_index_in_str_by_one
 
 logger = logging.getLogger("medfs")
-logger.setLevel(logging.INFO)
 
 
 class CylcEngine:

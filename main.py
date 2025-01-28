@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import logging
 import os
 from pathlib import Path
 
@@ -7,17 +8,14 @@ import click
 
 ROOT_DIR = Path(__file__).parent.resolve()
 HOME_DIR = Path.home()
+logger = logging.getLogger("medfs")
+logger.setLevel(logging.INFO)
+
 
 ########################
 # CYLC CONFIGURATION
 ########################
-CYLC_CONFIGURATION = {
-    "CYLC_CONDA_ENV": "cylc",
-    "CYLC_DEFAULT_RUN_NAME": "exp",
-    "CYLC_RUN_DIR": HOME_DIR / "cylc-run",
-    "CYLC_SRC_DIR": HOME_DIR / "cylc-src",
-    "CYLC_WF_DIR": ROOT_DIR / "wf",
-}
+CYLC_CONFIGURATION = {}
 
 
 def export_to_env(k: str, v: str) -> None:
