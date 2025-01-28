@@ -4,7 +4,6 @@ from pathlib import Path
 
 logger = logging.getLogger("medfs")
 CYLC_PACKAGE_PATH = Path(__file__).parent
-_CFG = None
 
 
 SETTINGS_TO_LOAD = ["src.cylc.settings"]
@@ -15,7 +14,7 @@ _imports = {
 
 
 class Settings:
-    def __init__(self, *modules: str, ext_settings: dict = None):
+    def __init__(self, *modules: str, **kwargs):
         """
         Initialize Settings by importing specified modules and setting attributes.
 
@@ -28,8 +27,7 @@ class Settings:
             for setting in dir(mod):
                 if setting.isupper():
                     setattr(self, setting, getattr(mod, setting))
-        if ext_settings is not None:
-            self.configure(**ext_settings)
+        self.configure(**kwargs)
 
     def configure(self, **ext_settings: dict):
         """
@@ -45,10 +43,7 @@ class Settings:
 
 # lazy load of settings
 def get_config(**kwargs) -> Settings:
-    global _CFG
-    if _CFG is None:
-        _CFG = Settings(*SETTINGS_TO_LOAD)
-    return _CFG
+    return Settings(*SETTINGS_TO_LOAD, **kwargs)
 
 
 # Dynamical imports

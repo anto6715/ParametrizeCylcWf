@@ -16,11 +16,9 @@ class CylcEngine:
     def __init__(
         self,
         workflow_cfg: Path,
-        run_name: str,
         **cfg
     ):
         self.flow_cylc = workflow_cfg
-        self.run_name = run_name
 
         # load and get cylc configuration
         self.cfg = get_config(**cfg)
@@ -33,7 +31,7 @@ class CylcEngine:
 
     @property
     def id(self) -> str:
-        return f"{self.workflow_name}/{self.run_name}"
+        return f"{self.workflow_name}/{self.cfg.CYLC_RUN_NAME}"
 
     @property
     def path_to_contact(self) -> Path:
@@ -137,7 +135,7 @@ class CylcEngine:
         """Determine the final run name to be installed"""
         if self.cfg.CYLC_EXTEND:
             return self.run_name_extension()
-        return self.run_name
+        return self.cfg.CYLC_RUN_NAME
 
     def run_name_extension(self) -> str:
         """Extend the latest run name available:
@@ -146,7 +144,7 @@ class CylcEngine:
         """
         workflow_run_path = self.cfg.CYLC_RUN / self.workflow_name
         run_directories = sorted(
-            [f for f in workflow_run_path.glob(f"{self.run_name}*")]  # noqa: C416
+            [f for f in workflow_run_path.glob(f"{self.cfg.CYLC_RUN_NAME}*")]  # noqa: C416
         )
         try:
             # Increase index of latest element
@@ -154,4 +152,4 @@ class CylcEngine:
             return increase_index_in_str_by_one(last_run.name)
         except IndexError:
             # If no previous run, return the default one
-            return self.run_name
+            return self.cfg.CYLC_RUN_NAME

@@ -10,7 +10,7 @@ def cylc_engine(
     flow_cylc, test_home, monkeypatch
 ):
     monkeypatch.setenv("HOME", test_home)
-    return CylcEngine(flow_cylc, RUN_NAME)
+    return CylcEngine(flow_cylc)
 
 
 @pytest.mark.parametrize(
@@ -39,7 +39,7 @@ def test_id(cylc_engine):
     [("my_run10", "my_workflow/my_run10"), ("my_run", "my_workflow/my_run")],
 )
 def test_id_user_run_name(flow_cylc, run_name, expected):
-    engine = CylcEngine(flow_cylc, run_name)
+    engine = CylcEngine(flow_cylc, **{"CYLC_RUN_NAME": run_name})
     assert engine.id == expected
 
 
@@ -151,7 +151,7 @@ def test_get_run_name_to_install(cylc_engine):
     ],
 )
 def test_get_run_name_to_install_with_extend(flow_cylc, cylc_run, run_names, expected):
-    cylc_engine = CylcEngine(flow_cylc, RUN_NAME, **{"CYLC_EXTEND": True})
+    cylc_engine = CylcEngine(flow_cylc, **{"CYLC_EXTEND": True})
     workflow_run_base_path = cylc_run / WORKFLOW_NAME
     shutil.rmtree(workflow_run_base_path, ignore_errors=True)
     for run_name in run_names:
