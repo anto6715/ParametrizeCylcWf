@@ -111,15 +111,16 @@ class CylcEngine:
         try:
             cylc_src_wf.parent.mkdir(parents=True, exist_ok=True)
             cylc_src_wf.symlink_to(self.flow)
+            logger.info(f"Linked {self.flow} to {cylc_src_wf}")
         except FileExistsError:
             if cylc_src_wf.samefile(self.flow):
                 return
             msg = f"Workflow conflicts\n\t- Installed: {cylc_src_wf}\n\t- Current: {self.flow}"
+            logger.error(msg)
             raise ValueError(msg)
 
     def install_workflow(self) -> None:
         if self.cfg.CYLC_RESUME:
-            # to resume a stopped cylc workflow is only necessary to remove contact file
             self.contact_path.unlink(missing_ok=True)
             return
 
@@ -132,20 +133,20 @@ class CylcEngine:
         self.link_flow_to_cylc_src()
         self.install()
 
-    def get_run_name_to_install(self):
+    def get_run_name_to_install(self) -> str:
         """Determine the final run name to be installed"""
         if self.cfg.CYLC_EXTEND:
             return self.run_name_extension()
         return self.run_name
 
-    def run_name_extension(self):
+    def run_name_extension(self) -> str:
         """Extend the latest run name available:
         - if exp is available return exp1
         - if expX is available return expX+1
         """
         workflow_run_path = self.cfg.CYLC_RUN / self.workflow_name
         run_directories = sorted(
-            [f for f in workflow_run_path.glob(f"{self.run_name}*")]
+            [f for f in workflow_run_path.glob(f"{self.run_name}*")]  # noqa: C416
         )
         try:
             # Increase index of latest element
