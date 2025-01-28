@@ -1,7 +1,7 @@
 import shutil
 
 import pytest
-from src.cylc import CylcEngine, cylc_util
+from cylc import CylcEngine, cylc_util
 from tests.conftest import RUN_NAME, WORKFLOW_NAME
 
 

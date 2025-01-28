@@ -6,10 +6,10 @@ logger = logging.getLogger("medfs")
 CYLC_PACKAGE_PATH = Path(__file__).parent
 
 
-SETTINGS_TO_LOAD = ["src.cylc.settings"]
+SETTINGS_TO_LOAD = ["cylc.settings"]
 _imports = {
-    "CylcEngine": "src.cylc.engine.CylcEngine",
-    "cylc_util": "src.cylc.util",
+    "CylcEngine": "cylc.engine.CylcEngine",
+    "cylc_util": "cylc.util",
 }
 
 

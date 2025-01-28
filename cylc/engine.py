@@ -6,8 +6,8 @@ import subprocess
 import time
 from pathlib import Path
 
-from src.cylc import get_config
-from src.cylc.util import increase_index_in_str_by_one
+from cylc import get_config
+from cylc.util import increase_index_in_str_by_one
 
 logger = logging.getLogger("medfs")
 
