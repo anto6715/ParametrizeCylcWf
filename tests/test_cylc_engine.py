@@ -46,7 +46,7 @@ def test_id_user_run_name(flow_cylc, run_name, expected):
 def test_contact_path(cylc_engine, cylc_run, test_home):
     expected = cylc_run / WORKFLOW_NAME / RUN_NAME / ".service" / "contact"
     expected.parent.mkdir(parents=True, exist_ok=True)
-    result = cylc_engine.contact_path
+    result = cylc_engine.path_to_contact
 
     assert result.as_posix() == expected.as_posix()
     print(result.as_posix())
@@ -56,7 +56,7 @@ def test_workflow_run_path(cylc_engine, cylc_run):
     workflow_id_path = cylc_run / WORKFLOW_NAME / RUN_NAME
     workflow_id_path.mkdir(parents=True, exist_ok=True)
 
-    result = cylc_engine.workflow_run_path
+    result = cylc_engine.cylc_run_directory
 
     assert result.is_dir()
     assert result.name + "cylc-run"
@@ -67,7 +67,7 @@ def test_cylc_src_base_path(cylc_engine, cylc_src):
     expected = cylc_src / WORKFLOW_NAME
     expected.mkdir(parents=True, exist_ok=True)
 
-    result = cylc_engine.cylc_src_workflow_base_path
+    result = cylc_engine.cylc_src_workflow_directory
 
     assert result.is_dir()
     assert result.name == WORKFLOW_NAME

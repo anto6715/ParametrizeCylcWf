@@ -15,11 +15,11 @@ logger = logging.getLogger("medfs")
 class CylcEngine:
     def __init__(
         self,
-        flow: Path,
+        workflow_cfg: Path,
         run_name: str,
         **cfg
     ):
-        self.flow = flow
+        self.flow_cylc = workflow_cfg
         self.run_name = run_name
 
         # load and get cylc configuration
@@ -29,30 +29,30 @@ class CylcEngine:
 
     @property
     def workflow_name(self):
-        return self.flow.stem
+        return self.flow_cylc.stem
 
     @property
     def id(self) -> str:
         return f"{self.workflow_name}/{self.run_name}"
 
     @property
-    def contact_path(self) -> Path:
+    def path_to_contact(self) -> Path:
         """Path to contact file (special sem file used by cylc itself)"""
         return self.cfg.CYLC_RUN / self.id / ".service" / "contact"
 
     @property
-    def workflow_run_path(self) -> Path:
+    def cylc_run_directory(self) -> Path:
         return self.cfg.CYLC_RUN / self.id
 
     @property
-    def cylc_src_workflow_base_path(self) -> Path:
+    def cylc_src_workflow_directory(self) -> Path:
         """Path to workflow directory in cylc-src"""
         return self.cfg.CYLC_SRC / self.workflow_name
 
     @property
     def cylc_src_workflow(self) -> Path:
         """Path to workflow installed in cylc-src path"""
-        return self.cylc_src_workflow_base_path / self.cfg.CYLC_WORKFLOW
+        return self.cylc_src_workflow_directory / self.cfg.CYLC_WORKFLOW
 
     def exec(self, cmd: str, opt: str, ignore: bool = False) -> None:
         """
@@ -78,7 +78,7 @@ class CylcEngine:
                 exit(1)
 
     def id_exist(self) -> bool:
-        return self.workflow_run_path.exists()
+        return self.cylc_run_directory.exists()
 
     def stop(self) -> None:
         """Wrapper to 'cylc stop' command + a sleep time to wait cylc"""
@@ -104,24 +104,24 @@ class CylcEngine:
     def stop_and_clean(self):
         self.stop()
         self.clean()
-        shutil.rmtree(self.cylc_src_workflow_base_path, ignore_errors=True)
+        shutil.rmtree(self.cylc_src_workflow_directory, ignore_errors=True)
 
     def link_flow_to_cylc_src(self) -> None:
         cylc_src_wf = self.cylc_src_workflow
         try:
             cylc_src_wf.parent.mkdir(parents=True, exist_ok=True)
-            cylc_src_wf.symlink_to(self.flow)
-            logger.info(f"Linked {self.flow} to {cylc_src_wf}")
+            cylc_src_wf.symlink_to(self.flow_cylc)
+            logger.info(f"Linked {self.flow_cylc} to {cylc_src_wf}")
         except FileExistsError:
-            if cylc_src_wf.samefile(self.flow):
+            if cylc_src_wf.samefile(self.flow_cylc):
                 return
-            msg = f"Workflow conflicts\n\t- Installed: {cylc_src_wf}\n\t- Current: {self.flow}"
+            msg = f"Workflow conflicts\n\t- Installed: {cylc_src_wf}\n\t- Current: {self.flow_cylc}"
             logger.error(msg)
             raise ValueError(msg)
 
     def install_workflow(self) -> None:
         if self.cfg.CYLC_RESUME:
-            self.contact_path.unlink(missing_ok=True)
+            self.path_to_contact.unlink(missing_ok=True)
             return
 
         if self.cfg.CYLC_OVERWRITE:
