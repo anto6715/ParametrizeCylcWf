@@ -1,6 +1,6 @@
 import pytest
 
-from src.cylc_engine import CylcEngine, increase_index_in_str
+from src.cylc import CylcEngine, cylc_util
 from tests.conftest import RUN_NAME, WORKFLOW_NAME
 
 
@@ -16,7 +16,7 @@ def cylc_engine(
     [("exp", "exp1"), ("exp10", "exp11"), ("exp1", "exp2"), ("1exp1", "1exp2")],
 )
 def test_increase_index_in_str(run_name, expected):
-    s = increase_index_in_str(run_name)
+    s = cylc_util.increase_index_in_str_by_one(run_name)
     assert s == expected
 
 

@@ -7,11 +7,11 @@ import subprocess
 import time
 from pathlib import Path
 
-from src import cylc_config as cfg
+from src.cylc import cylc_config as cfg
+from src.cylc.util import increase_index_in_str_by_one
 
 logger = logging.getLogger("medfs")
 logger.setLevel(logging.INFO)
-STR_INDEX = re.compile(r"(\d+)$")
 
 
 class CylcEngine:
@@ -154,21 +154,7 @@ class CylcEngine:
         try:
             # Increase index of latest element
             last_run = sorted(run_directories)[-1]
-            return increase_index_in_str(last_run.name)
+            return increase_index_in_str_by_one(last_run.name)
         except IndexError:
             # If no previous run, return the default one
             return self.run_name
-
-
-def increase_index_in_str(s: str) -> str:
-    """Given a string like expX, return expY, where Y = X + 1"""
-    match = STR_INDEX.search(s)
-    if match:
-        # Get the starting position of the number and the number itself.
-        start_index = match.start()
-        number = int(match.group())
-        # Increment the number and reconstruct the string.
-        return s[:start_index] + str(number + 1)
-    else:
-        # If no number is found, append "1" to the string.
-        return f"{s}1"
