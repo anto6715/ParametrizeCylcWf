@@ -1,47 +1,56 @@
 #!/usr/bin/env python
 
 import logging
-import re
 import shutil
 import subprocess
 import time
 from pathlib import Path
 
-from src import cylc_config as cfg
+from cylc import get_config
+from cylc.util import increase_index_in_str_by_one
 
 logger = logging.getLogger("medfs")
-STR_INDEX = re.compile("\d+$")
 
 
 class CylcEngine:
     def __init__(
         self,
-        flow: Path,
-        run_name: str,
-        resume: bool = cfg.DEFAULT_RESUME,
-        overwrite: bool = cfg.DEFAULT_OVERWRITE,
-        extend: bool = cfg.DEFAULT_EXTEND,
+        workflow_cfg: Path,
+        **cfg
     ):
-        self.flow = flow
-        self.run_name = run_name
-        self.resume = resume
-        self.overwrite = overwrite
-        self.extend = extend
+        self.flow_cylc = workflow_cfg
+
+        # load and get cylc configuration
+        self.cfg = get_config(**cfg)
 
         self.installed_run_name = None
 
     @property
     def workflow_name(self):
-        return self.flow.stem
+        return self.flow_cylc.stem
 
     @property
     def id(self) -> str:
-        return f"{self.workflow_name}/{self.run_name}"
+        return f"{self.workflow_name}/{self.cfg.CYLC_RUN_NAME}"
 
     @property
-    def contact_path(self) -> Path:
+    def path_to_contact(self) -> Path:
         """Path to contact file (special sem file used by cylc itself)"""
-        return cfg.cylc_run() / ".service" / "contact"
+        return self.cfg.CYLC_RUN / self.id / ".service" / "contact"
+
+    @property
+    def cylc_run_directory(self) -> Path:
+        return self.cfg.CYLC_RUN / self.id
+
+    @property
+    def cylc_src_workflow_directory(self) -> Path:
+        """Path to workflow directory in cylc-src"""
+        return self.cfg.CYLC_SRC / self.workflow_name
+
+    @property
+    def cylc_src_workflow(self) -> Path:
+        """Path to workflow installed in cylc-src path"""
+        return self.cylc_src_workflow_directory / self.cfg.CYLC_WORKFLOW
 
     def exec(self, cmd: str, opt: str, ignore: bool = False) -> None:
         """
@@ -67,14 +76,16 @@ class CylcEngine:
                 exit(1)
 
     def id_exist(self) -> bool:
-        return (cfg.cylc_run() / self.id).exists()
+        return self.cylc_run_directory.exists()
 
     def stop(self) -> None:
+        """Wrapper to 'cylc stop' command + a sleep time to wait cylc"""
         self.exec("stop", ignore=True)
         # usually cylc stop return immediately, but it takes some seconds to be effective
         time.sleep(3)
 
     def clean(self):
+        """Wrapper to 'cylc clean' command"""
         if not self.id_exist():
             return
         self.exec("clean")
@@ -85,38 +96,33 @@ class CylcEngine:
         self.exec("install", opt=f"--run-name {self.installed_run_name}")
 
     def play(self):
+        """Wrapper to 'cylc play' command"""
         self.exec("play")
-
-    def cylc_src_workflow_base_path(self) -> Path:
-        """Path to workflow directory in cylc-src"""
-        return cfg.cylc_src() / self.workflow_name
-
-    def cylc_src_workflow(self) -> Path:
-        """Path to workflow installed in cylc-src path"""
-        return self.cylc_src_workflow_base_path() / cfg.CYLC_SRC_FLOW_NAME
 
     def stop_and_clean(self):
         self.stop()
         self.clean()
-        shutil.rmtree(self.cylc_src_workflow_base_path(), ignore_errors=True)
+        shutil.rmtree(self.cylc_src_workflow_directory, ignore_errors=True)
 
-    def link_flow_to_cylc_src(self):
-        cylc_src_wf = self.cylc_src_workflow()
+    def link_flow_to_cylc_src(self) -> None:
+        cylc_src_wf = self.cylc_src_workflow
         try:
-            cylc_src_wf.symlink_to(self.flow)
+            cylc_src_wf.parent.mkdir(parents=True, exist_ok=True)
+            cylc_src_wf.symlink_to(self.flow_cylc)
+            logger.info(f"Linked {self.flow_cylc} to {cylc_src_wf}")
         except FileExistsError:
-            if cylc_src_wf.samefile(self.flow):
+            if cylc_src_wf.samefile(self.flow_cylc):
                 return
-            msg = f"Workflow conflicts\n\t- Installed: {cylc_src_wf}\n\t- Current: {self.flow}"
+            msg = f"Workflow conflicts\n\t- Installed: {cylc_src_wf}\n\t- Current: {self.flow_cylc}"
+            logger.error(msg)
             raise ValueError(msg)
 
     def install_workflow(self) -> None:
-        if self.resume:
-            # to resume a stopped cylc workflow is only necessary to remove contact file
-            self.contact_path.unlink(missing_ok=True)
+        if self.cfg.CYLC_RESUME:
+            self.path_to_contact.unlink(missing_ok=True)
             return
 
-        if self.overwrite:
+        if self.cfg.CYLC_OVERWRITE:
             self.stop_and_clean()
 
         if self.id_exist():
@@ -125,35 +131,25 @@ class CylcEngine:
         self.link_flow_to_cylc_src()
         self.install()
 
-    def get_run_name_to_install(self):
+    def get_run_name_to_install(self) -> str:
         """Determine the final run name to be installed"""
-        if self.extend:
+        if self.cfg.CYLC_EXTEND:
             return self.run_name_extension()
-        return self.run_name
+        return self.cfg.CYLC_RUN_NAME
 
-    def run_name_extension(self):
+    def run_name_extension(self) -> str:
         """Extend the latest run name available:
         - if exp is available return exp1
         - if expX is available return expX+1
         """
-        workflow_run_path = cfg.cylc_run() / self.workflow_name
+        workflow_run_path = self.cfg.CYLC_RUN / self.workflow_name
         run_directories = sorted(
-            [f for f in workflow_run_path.glob(f"{self.run_name}*")]
+            [f for f in workflow_run_path.glob(f"{self.cfg.CYLC_RUN_NAME}*")]  # noqa: C416
         )
         try:
             # Increase index of latest element
             last_run = sorted(run_directories)[-1]
-            return increase_index_in_str(last_run.name)
+            return increase_index_in_str_by_one(last_run.name)
         except IndexError:
             # If no previous run, return the default one
-            return self.run_name
-
-
-def increase_index_in_str(s: str) -> str:
-    """Given a string like expX, return expY, where Y = X + 1"""
-    try:
-        index = int(STR_INDEX.findall(s)[0])
-    except IndexError:
-        index = 0
-
-    return s.replace(s, str(index + 1))
+            return self.cfg.CYLC_RUN_NAME
