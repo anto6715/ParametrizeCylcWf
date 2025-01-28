@@ -1,33 +1,45 @@
 import importlib
 import logging
-import os
 from pathlib import Path
-from typing import Dict, Any
 
-import yaml
-
-CYLC_PACKAGE_PATH = Path(__file__).parent
-DEFAULT_CYLC_CONFIG = CYLC_PACKAGE_PATH / "config" / "default_config.yaml"
 logger = logging.getLogger("medfs")
+CYLC_PACKAGE_PATH = Path(__file__).parent
 _CFG = None
 
+
+SETTINGS_TO_LOAD = ["src.cylc.settings"]
 _imports = {
     "CylcEngine": "src.cylc.engine.CylcEngine",
     "cylc_util": "src.cylc.util",
 }
 
 
-def get_config() -> Dict[str, Any]:
+class Settings:
+    def __init__(self, *modules, ext_settings=None):
+        for module in modules:
+            mod = importlib.import_module(module)
+            for setting in dir(mod):
+                if setting.isupper():
+                    setattr(self, setting, getattr(mod, setting))
+        if ext_settings is not None:
+            self.configure(**ext_settings)
+
+    def configure(self, **ext_settings):
+        """Set new settings or override default ones."""
+        for key, value in ext_settings.items():
+            if key.isupper():
+                setattr(self, key, value)
+
+
+# lazy load of settings
+def get_config(**kwargs) -> Settings:
     global _CFG
     if _CFG is None:
-        cylc_config = Path(os.getenv("CYLC_CONFIG", DEFAULT_CYLC_CONFIG))
-        logger.debug(f"CYLC_CONFIG={CYLC_PACKAGE_PATH}")
-        with cylc_config.open() as config:
-            _CFG = yaml.safe_load(config)
+        _CFG = Settings(*SETTINGS_TO_LOAD)
     return _CFG
 
 
-# Dynamical import
+# Dynamical imports
 globals().update(
     {
         name: importlib.import_module(module.rsplit(".", 1)[0]).__dict__[

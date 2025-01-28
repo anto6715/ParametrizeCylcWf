@@ -6,7 +6,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from src.cylc import cylc_config as cfg
+from src.cylc import get_config
 from src.cylc.util import increase_index_in_str_by_one
 
 logger = logging.getLogger("medfs")
@@ -17,15 +17,13 @@ class CylcEngine:
         self,
         flow: Path,
         run_name: str,
-        resume: bool = cfg.DEFAULT_RESUME,
-        overwrite: bool = cfg.DEFAULT_OVERWRITE,
-        extend: bool = cfg.DEFAULT_EXTEND,
+        **cfg
     ):
         self.flow = flow
         self.run_name = run_name
-        self.resume = resume
-        self.overwrite = overwrite
-        self.extend = extend
+
+        # load and get cylc configuration
+        self.cfg = get_config(**cfg)
 
         self.installed_run_name = None
 
@@ -40,21 +38,21 @@ class CylcEngine:
     @property
     def contact_path(self) -> Path:
         """Path to contact file (special sem file used by cylc itself)"""
-        return cfg.cylc_run() / self.id / ".service" / "contact"
+        return self.cfg.CYLC_RUN / self.id / ".service" / "contact"
 
     @property
     def workflow_run_path(self) -> Path:
-        return cfg.cylc_run() / self.id
+        return self.cfg.CYLC_RUN / self.id
 
     @property
     def cylc_src_workflow_base_path(self) -> Path:
         """Path to workflow directory in cylc-src"""
-        return cfg.cylc_src() / self.workflow_name
+        return self.cfg.CYLC_SRC / self.workflow_name
 
     @property
     def cylc_src_workflow(self) -> Path:
         """Path to workflow installed in cylc-src path"""
-        return self.cylc_src_workflow_base_path / cfg.CYLC_SRC_FLOW_NAME
+        return self.cylc_src_workflow_base_path / self.cfg.CYLC_WORKFLOW
 
     def exec(self, cmd: str, opt: str, ignore: bool = False) -> None:
         """
@@ -111,7 +109,7 @@ class CylcEngine:
     def link_flow_to_cylc_src(self) -> None:
         cylc_src_wf = self.cylc_src_workflow
         try:
-            cylc_src_wf.parent.mkdir(parents=True)
+            cylc_src_wf.parent.mkdir(parents=True, exist_ok=True)
             cylc_src_wf.symlink_to(self.flow)
         except FileExistsError:
             if cylc_src_wf.samefile(self.flow):
@@ -120,12 +118,12 @@ class CylcEngine:
             raise ValueError(msg)
 
     def install_workflow(self) -> None:
-        if self.resume:
+        if self.cfg.CYLC_RESUME:
             # to resume a stopped cylc workflow is only necessary to remove contact file
             self.contact_path.unlink(missing_ok=True)
             return
 
-        if self.overwrite:
+        if self.cfg.CYLC_OVERWRITE:
             self.stop_and_clean()
 
         if self.id_exist():
@@ -136,7 +134,7 @@ class CylcEngine:
 
     def get_run_name_to_install(self):
         """Determine the final run name to be installed"""
-        if self.extend:
+        if self.cfg.CYLC_EXTEND:
             return self.run_name_extension()
         return self.run_name
 
@@ -145,7 +143,7 @@ class CylcEngine:
         - if exp is available return exp1
         - if expX is available return expX+1
         """
-        workflow_run_path = cfg.cylc_run() / self.workflow_name
+        workflow_run_path = self.cfg.CYLC_RUN / self.workflow_name
         run_directories = sorted(
             [f for f in workflow_run_path.glob(f"{self.run_name}*")]
         )

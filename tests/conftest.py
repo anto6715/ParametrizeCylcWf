@@ -58,26 +58,25 @@ FLOW_CONTENT = """
 """
 
 
+@pytest.fixture(scope="session")
+def test_home(tmp_path_factory):
+    return tmp_path_factory.mktemp("home")
+
+
 @pytest.fixture
-def cylc_run(monkeypatch, tmp_path):
+def cylc_run(test_home):
     """Define cylc run and export value as CYLC_RUN_DIR"""
-    cylc_run_path = tmp_path / "cylc-run"
-    monkeypatch.setenv("CYLC_RUN_DIR", cylc_run_path.as_posix())
-
-    return cylc_run_path
+    return test_home / "cylc-run"
 
 
 @pytest.fixture
-def cylc_src(monkeypatch, tmp_path):
+def cylc_src(test_home):
     """Define cylc run and export value as CYLC_RUN_DIR"""
-    cylc_src_path = tmp_path / "cylc-src"
-    monkeypatch.setenv("CYLC_SRC_DIR", cylc_src_path.as_posix())
-
-    return cylc_src_path
+    return test_home / "cylc-src"
 
 
 @pytest.fixture
-def flow_cylc(tmp_path):
-    f = tmp_path / "my_workflow.cylc"
+def flow_cylc(test_home):
+    f = test_home / "my_workflow.cylc"
     f.write_text(FLOW_CONTENT)
     return f

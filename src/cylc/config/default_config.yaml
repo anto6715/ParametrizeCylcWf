@@ -1,5 +1,0 @@
----
-CYLC_DEFAULT_RUN_NAME: "exp"
-CYLC_CONDA_ENV: "$CYLC_CONDA"
-CYLC_RUN_DIR: "$HOME/cylc-run"
-CYLC_SRC_DIR: "$HOME/cylc-src"

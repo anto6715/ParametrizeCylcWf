@@ -1,13 +1,15 @@
-import pytest
+import shutil
 
+import pytest
 from src.cylc import CylcEngine, cylc_util
 from tests.conftest import RUN_NAME, WORKFLOW_NAME
 
 
 @pytest.fixture
 def cylc_engine(
-    flow_cylc,
+    flow_cylc, test_home, monkeypatch
 ):
+    monkeypatch.setenv("HOME", test_home)
     return CylcEngine(flow_cylc, RUN_NAME)
 
 
@@ -41,15 +43,13 @@ def test_id_user_run_name(flow_cylc, run_name, expected):
     assert engine.id == expected
 
 
-def test_contact_path(monkeypatch, cylc_engine, cylc_run):
+def test_contact_path(cylc_engine, cylc_run, test_home):
     expected = cylc_run / WORKFLOW_NAME / RUN_NAME / ".service" / "contact"
     expected.parent.mkdir(parents=True, exist_ok=True)
-    expected.touch()
-
     result = cylc_engine.contact_path
 
-    assert result.is_file()
-    assert result.samefile(expected)
+    assert result.as_posix() == expected.as_posix()
+    print(result.as_posix())
 
 
 def test_workflow_run_path(cylc_engine, cylc_run):
@@ -88,7 +88,7 @@ def test_cylc_src_workflow(cylc_engine, cylc_src):
 def test_link_flow_to_cylc_src(cylc_engine, flow_cylc, cylc_src):
     expected = cylc_src / WORKFLOW_NAME / "flow.cylc"
 
-    assert not cylc_engine.cylc_src_workflow.is_file()
+    cylc_engine.cylc_src_workflow.unlink(missing_ok=True)
     assert not expected.is_file()
 
     cylc_engine.link_flow_to_cylc_src()
@@ -101,10 +101,12 @@ def test_link_flow_to_cylc_src_with_conflict(
     tmp_path, cylc_engine, flow_cylc, cylc_src
 ):
     expected = cylc_src / WORKFLOW_NAME / "flow.cylc"
+    expected.unlink(missing_ok=True)
+
     other_flow = tmp_path / "other.cylc"
     other_flow.touch()
 
-    expected.parent.mkdir(parents=True)
+    expected.parent.mkdir(parents=True, exist_ok=True)
     expected.symlink_to(other_flow)
 
     with pytest.raises(ValueError):
@@ -125,10 +127,11 @@ def test_link_flow_to_cylc_src_with_conflict(
 )
 def test_run_name_extension(cylc_engine, cylc_run, run_names, expected):
     workflow_run_base_path = cylc_run / WORKFLOW_NAME
+    shutil.rmtree(workflow_run_base_path, ignore_errors=True)
     for run_name in run_names:
         (workflow_run_base_path / run_name).mkdir(parents=True, exist_ok=True)
-
-    assert cylc_engine.run_name_extension() == expected
+    result = cylc_engine.run_name_extension()
+    assert result == expected
 
 
 def test_get_run_name_to_install(cylc_engine):
@@ -148,8 +151,9 @@ def test_get_run_name_to_install(cylc_engine):
     ],
 )
 def test_get_run_name_to_install_with_extend(flow_cylc, cylc_run, run_names, expected):
-    cylc_engine = CylcEngine(flow_cylc, RUN_NAME, extend=True)
+    cylc_engine = CylcEngine(flow_cylc, RUN_NAME, **{"CYLC_EXTEND": True})
     workflow_run_base_path = cylc_run / WORKFLOW_NAME
+    shutil.rmtree(workflow_run_base_path, ignore_errors=True)
     for run_name in run_names:
         (workflow_run_base_path / run_name).mkdir(parents=True, exist_ok=True)
 
